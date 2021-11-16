@@ -2,6 +2,7 @@ package nachos.threads;
 
 import nachos.machine.*;
 
+import java.util.LinkedList;
 import java.util.TreeSet;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -126,10 +127,12 @@ public class PriorityScheduler extends Scheduler {
      * A <tt>ThreadQueue</tt> that sorts threads by priority.
      */
     protected class PriorityQueue extends ThreadQueue {
-	PriorityQueue(boolean transferPriority) {
+		public LinkedList<ThreadState> waitlist=new LinkedList<>();
+
+		PriorityQueue(boolean transferPriority) {
 	    this.transferPriority = transferPriority;
 	}
-
+//   将需要等待获得资源的线程加入一个等待队列等待调度。
 	public void waitForAccess(KThread thread) {
 	    Lib.assertTrue(Machine.interrupt().disabled());
 	    getThreadState(thread).waitForAccess(this);
@@ -139,17 +142,18 @@ public class PriorityScheduler extends Scheduler {
 	    Lib.assertTrue(Machine.interrupt().disabled());
 	    getThreadState(thread).acquire(this);
 	}
-
+		//返回下一个要执行的线程，遍历队列，计算出所有线程的有效优先级
+// （计算的时候是递归计算每个ThreadState队列中每个线程的有效优先级，
+// 大于自己的优先级，则将它的有效优先级赋给自己），取出有效优先级最大的线程执行。
 	public KThread nextThread() {
 	    Lib.assertTrue(Machine.interrupt().disabled());
 		ThreadState next = pickNextThread();//下一个选择的线程
 		if(next == null)//如果为null,则返回null
 			return null;
-		KThread thread = next.thread;
-		getThreadState(thread).acquire(this);//将得到的线程改为this线程队列的队列头
-		return thread;//将该线程返回
+		waitlist.remove(next);
+		return next.thread;
 	}
-
+		/** *返回<tt>nextThread()</tt>将返回的下一个线程，*不修改这个队列的状态。 * * @返回<tt>nextThread()</tt>将返回的下一个线程。
 	/**
 	 * Return the next thread that <tt>nextThread()</tt> would return,
 	 * without modifying the state of this queue.
@@ -157,14 +161,42 @@ public class PriorityScheduler extends Scheduler {
 	 * @return	the next thread that <tt>nextThread()</tt> would
 	 *		return.
 	 */
+		//找出优先级最大的线程
 	protected ThreadState pickNextThread() {
-	    // implement me
-	    return null;
+		ThreadState nextThreadState = null;
+
+		// 当前最大优先级
+		int currentMaxPriority = -1;
+
+		// 遍历优先级队列中的每一个线程
+		for (ThreadState threadState: waitlist) {
+
+			// 判断是否可以传递优先级
+			int threadPriority;
+			if (transferPriority) {
+				// 获取线程包括其等待队列的最高优先级
+				threadPriority = threadState.getEffectivePriority();
+			} else {
+				// 获取线程的优先级（未传递）
+				threadPriority = threadState.getPriority();
+			}
+
+			// 选择优先级更高的线程
+			if (threadPriority > currentMaxPriority) {
+				nextThreadState = threadState;
+				currentMaxPriority = nextThreadState.priority;
+			}
+		}
+
+		return nextThreadState;
 	}
 	
 	public void print() {
 	    Lib.assertTrue(Machine.interrupt().disabled());
 	    // implement me (if you want)
+		for (Iterator i=waitlist.iterator();i.hasNext();){
+			System.out.println(i.next()+"");
+		}
 	}
 
 	/**
@@ -209,8 +241,29 @@ public class PriorityScheduler extends Scheduler {
 	 * @return	the effective priority of the associated thread.
 	 */
 	public int getEffectivePriority() {
-	    // implement me
-	    return priority;
+		// 如果该线程有等待队列
+		if (thread.waitQueue != null) {
+			// 创建一个链表来临时存放该线程的等待队列中的线程
+			ThreadQueue newQueue = ThreadedKernel.scheduler.newThreadQueue(true);
+
+			// 遍历该线程的等待队列中的所有线程
+			KThread waitThread;
+			int waitThreadPriority;
+			while ((waitThread = thread.waitQueue.nextThread()) != null) {
+				// 将取出的线程添加到队列中去
+				newQueue.waitForAccess(waitThread);
+				// 如果等待队列中的线程的优先级更高，就把优先级传递给该线程
+				waitThreadPriority = getThreadState(waitThread).getPriority();
+				if (priority < waitThreadPriority){
+					priority = waitThreadPriority;
+				}
+			}
+
+			// 完成等待队列的转移和交换
+			thread.waitQueue = newQueue;
+		}
+
+		return priority;
 	}
 
 	/**
@@ -241,6 +294,10 @@ public class PriorityScheduler extends Scheduler {
 	 */
 	public void waitForAccess(PriorityQueue waitQueue) {
 	    // implement me
+		Lib.assertTrue(Machine.interrupt().disabled());
+
+		// 将线程加入优先级队列中去
+		waitQueue.waitlist.add(this);
 	}
 
 	/**
@@ -252,13 +309,21 @@ public class PriorityScheduler extends Scheduler {
 	 *
 	 * @see	nachos.threads.ThreadQueue#acquire
 	 * @see	nachos.threads.ThreadQueue#nextThread
+	 *
 	 */
+	//这个是干什么的
 	public void acquire(PriorityQueue waitQueue) {
 	    // implement me
+		//waitQueue.waitlist.remove(this);//如果这个队列中存在该线程，删除
+		Lib.assertTrue(Machine.interrupt().disabled());
+
+		// 断言此时优先级队列中内容为空
+		Lib.assertTrue(waitQueue.waitlist.isEmpty());
 	}	
 
 	/** The thread with which this object is associated. */	   
 	protected KThread thread;
+
 	/** The priority of the associated thread. */
 	protected int priority;
     }

@@ -46,8 +46,8 @@ public class KThread {
 	if (currentThread != null) {
 	    tcb = new TCB();
 	}	    
-	else {
-	    readyQueue = ThreadedKernel.scheduler.newThreadQueue(false);
+	else {//是否允许优先级传递
+	    readyQueue = ThreadedKernel.scheduler.newThreadQueue(true);
 	    readyQueue.acquire(this);	    
 
 	    currentThread = this;
@@ -311,18 +311,17 @@ public class KThread {
 	public void join1(){
 		Lib.debug(dbgThread, "Joining to thread: " + toString());
 
-		Lib.assertTrue(this != currentThread);
+		Lib.assertTrue(this != currentThread);//调用该方法的进程与正在运行的进程不一致
 
-		boolean status = Machine.interrupt().disable();
+		boolean status = Machine.interrupt().disable();//关中断
 		waitQueue.acquire(this);
 		if (this.status != statusFinished) {
 			//将KThread下的current对象放入waitQueue
 			waitQueue.waitForAccess(KThread.currentThread());
 			//将当前线程睡眠
-
 			sleep();
 		}
-		Machine.interrupt().restore(status);
+		Machine.interrupt().restore(status);//开中断
 	}
 
 
@@ -559,14 +558,14 @@ public class KThread {
 			@Override
 			public void run() {
 				communicator.speak(1);
-				System.out.println("speaker1说“你好”");
+				System.out.println("speaker1说1");
 			}
 		});
 		KThread speaker2=new KThread(new Runnable() {
 			@Override
 			public void run() {
 				communicator.speak(2);
-				System.out.println("speaker2 said hello");
+				System.out.println("speaker2说2");
 			}
 		});
 		KThread listener1=new KThread(new Runnable() {
@@ -591,26 +590,67 @@ public class KThread {
 	public static void test_Priority(){
 		boolean status=Machine.interrupt().disable();//关中断
 		//线程A
-		KThread kThreadA=new KThread(new PingTest(1)).setName("threadA");//创建线程A，执行pingtest
+		KThread kThreadA=new KThread(new Runnable() {
+			@Override
+			public void run() {
+				System.out.println("A线程开始运行");
+				System.out.println("A让出CPU");
+				yield();
+				System.out.println("A重新使用CPU");
+				System.out.println("A线程结束运行");
+			}
+		}).setName("threadA");//创建线程A
+		//线程B
 		new PriorityScheduler().setPriority(kThreadA,2);//将线程A的优先级设为2
 		System.out.println("threadA的优先级为："+new PriorityScheduler().getThreadState(kThreadA).priority);//输出A的优先级
-		//线程B
-		KThread kThreadB=new KThread(new PingTest(2)).setName("threadB");
-		new PriorityScheduler().setPriority(kThreadB,4);
-		System.out.println("threadB的优先级为："+new PriorityScheduler().getThreadState(kThreadB).priority);
+		KThread kThreadB=new KThread(new Runnable() {
+			@Override
+			public void run() {
+				System.out.println("B线程开始运行");
+				System.out.println("B让出CPU");
+				yield();
+				System.out.println("B重新使用CPU");
+				System.out.println("B线程结束运行");
+			}
+		}).setName("threadB");//创建线程B
+		new PriorityScheduler().setPriority(kThreadB,4);//将线程B的优先级设为4
+		System.out.println("threadB的优先级为："+new PriorityScheduler().getThreadState(kThreadB).priority);//输出B的优先级
 		//线程C
-		KThread kThreadC=new KThread(new PingTest(3)).setName("threadC");
-		new PriorityScheduler().setPriority(kThreadC,6);
-		System.out.println("threadC的优先级为："+new PriorityScheduler().getThreadState(kThreadC).priority);
-		//线程C
-		KThread kThreadD=new KThread(new PingTest(4)).setName("threadC");
-		System.out.println("threadD的优先级为："+new PriorityScheduler().getThreadState(kThreadC).priority);
+		KThread kThreadC=new KThread(new Runnable() {
+			@Override
+			public void run() {
+				System.out.println("C线程开始运行");
+				System.out.println("C让出CPU");
+				yield();
+				System.out.println("C重新使用CPU");
+				System.out.println("C线程等待A线程");
+				kThreadA.join1();
+				System.out.println("C重新使用CPU");
+				System.out.println("C线程结束运行");
+				// 不允许优先级传递时打印下面的语句
+				System.out.println("\n<--- 题目 5 结束测试 --->\n");
+			}
+		}).setName("threadC");//创建线程C
+		new PriorityScheduler().setPriority(kThreadC,6);//将线程C的优先级设为6
+		System.out.println("threadC的优先级为："+new PriorityScheduler().getThreadState(kThreadC).priority);//输出C的优先级
+
 		kThreadA.fork();//run
 		kThreadB.fork();
 		kThreadC.fork();
-		kThreadD.fork();
 
 
+
+	}
+	public static void test_Boat(){
+		Lib.debug(dbgThread, "Enter KThread.selfTest");
+		System.out.println("-----Boat test begin-----");
+
+		new KThread(new Runnable(){
+			public void run(){
+				Boat.selfTest();
+			}
+		}).fork();
+		System.out.println("Successful");
 	}
     public static void selfTest() {
 	Lib.debug(dbgThread, "Enter KThread.selfTest");
@@ -621,8 +661,9 @@ public class KThread {
 	//my_join_test();
 	//test_condition_var();
 	//test_Alarm();
-	//	test_communicator();
-    test_Priority();
+	//test_communicator();
+    //test_Priority();
+		test_Boat();
 	}
 
     private static final char dbgThread = 't';
@@ -633,7 +674,7 @@ public class KThread {
      * @see	nachos.threads.PriorityScheduler.ThreadState
      */
     public Object schedulingState = null;
-	private ThreadQueue waitQueue = ThreadedKernel.scheduler.newThreadQueue(true);
+	ThreadQueue waitQueue = ThreadedKernel.scheduler.newThreadQueue(true);
 	private boolean hasAcquired = false;
     private static final int statusNew = 0;
     private static final int statusReady = 1;

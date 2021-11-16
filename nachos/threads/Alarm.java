@@ -37,7 +37,7 @@ public class Alarm {
      */
     public void timerInterrupt() {
         boolean status=Machine.interrupt().disable();
-        long currentTime=Machine.timer().getTime();
+        long currentTime=Machine.timer().getTime();//获取现在的时间
         int size = list.size();
         if(size!=0){
             for (int i=0;i<size;i++)
