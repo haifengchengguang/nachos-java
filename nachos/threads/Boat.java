@@ -4,97 +4,123 @@ import nachos.ag.BoatGrader;
 public class Boat
 {
     static BoatGrader bg;
-    static boolean boatInO;
-    static int num_children_O;
-    static int num_alduts_O;
-    static int num_children_M;
-    static int num_alduts_M;
-    static Lock lock;
-    static Condition children_condition_o;
-    static Condition children_condition_m;
-    static Condition alduts_condition_o;
-    static boolean gameover;
-    static boolean is_pilot;
-    static boolean is_adult_go;
+    // 条件变量
+    private static Lock lock;
+    private static Condition2 boatCondition;
+    private static Condition2 adultsCondition;
+    private static Condition2 startChildrenCondition, endChildrenContidion;
+
+    // 起点人数
+    private static int startAdultsCount, startChildrenCount;
+    private static int endChildrenCount;
+    // 船上人数
+    private static int boatAdultsCount, boatChildrenCount;
+
+    // 船是否在起点
+    private static boolean boatStart;
+
+    // 是否都到达目的地
+    private static boolean success;
+
     public static void selfTest()
     {
-	BoatGrader b = new BoatGrader();
-
+//	BoatGrader b = new BoatGrader();
+//
 //	System.out.println("\n ***Testing Boats with only 2 children***");
 //	begin(0, 2, b);
+//        System.out.println("\n<--- 题目 6 开始测试 --->\n");
+        begin(1, 2);
 
-	System.out.println("\n ***Testing Boats with 2 children, 1 adult***");
-  	begin(1, 2, b);
+//	System.out.println("\n ***Testing Boats with 2 children, 1 adult***");
+//  	begin(1, 2, b);
 
 //  	System.out.println("\n ***Testing Boats with 3 children, 3 adults***");
 //  	begin(3, 3, b);
     }
 
-    public static void begin( int adults, int children, BoatGrader b )
+    public static void begin( int adults, int children)
     {
 	// Store the externally generated autograder in a class
 	// variable to be accessible by children.
-	    bg = b;
-        num_children_O=children;
-        num_alduts_O = adults;
-        num_alduts_M = 0;
-        num_children_M = 0;
-        boatInO = true;
-        lock = new Lock();
-        children_condition_o = new Condition(lock);
-        children_condition_m = new Condition(lock);
-        alduts_condition_o = new Condition(lock);
-        gameover = false;
-        is_pilot = true;
-        is_adult_go = false;
-        for(int i = 0;i<adults;i++){//每个大人为一个线程
-            new KThread(new Runnable(){
-                public void run(){
-                    AdultItinerary();
-                }
-            }).fork();;
-        }
+	//bg = b;
 
-        for(int i = 0;i<children;i++){//每个小孩为一个线程
-            new KThread(new Runnable(){
-                public void run(){
-                    ChildItinerary();
-                }
-            }).fork();;
-        }
 	// Instantiate global variables here
 	
 	// Create threads here. See section 3.4 of the Nachos for Java
 	// Walkthrough linked from the projects page.
+// 参数校验
+        if (adults < 0 || children < 2) {
+            System.out.println("数据异常");
+            return;
+        }
 
-	/*Runnable r = new Runnable() {
-	    public void run() {
-                SampleItinerary();
-            }
-        };
-        KThread t = new KThread(r);
-        t.setName("Sample Boat Thread");
-        t.fork();*/
+        // 初始化条件变量
+        lock = new Lock();
+        boatCondition = new Condition2(lock);
+        adultsCondition = new Condition2(lock);
+        startChildrenCondition = new Condition2(lock);
+        endChildrenContidion = new Condition2(lock);
+
+        // 初始化初始人数
+        startAdultsCount = adults;
+        startChildrenCount = children;
+
+        // 初始化船的位置
+        boatStart = true;
+
+        // 创建并运行大人线程
+        for (int i = 0; i < adults; i++) {
+            new KThread(new Runnable() {
+                @Override
+                public void run() {
+                    AdultItinerary();
+                }
+            }).fork();
+        }
+
+        // 创建并运行小孩线程
+        for (int i = 0; i < children; i++) {
+            new KThread(new Runnable() {
+                @Override
+                public void run() {
+                    ChildItinerary();
+                }
+            }).fork();
+        }
+//	Runnable r = new Runnable() {
+//	    public void run() {
+//                SampleItinerary();
+//            }
+//        };
+//        KThread t = new KThread(r);
+//        t.setName("Sample Boat Thread");
+//        t.fork();
 
     }
 
     static void AdultItinerary()
     {
-	    bg.initializeAdult(); //Required for autograder interface. Must be the first thing called.
-        lock.acquire();//申请锁
-        if(!(is_adult_go&&boatInO)){//如果大人不走，或者船不在O岛，则大人睡眠
-            alduts_condition_o.sleep();
-        }
-        bg.AdultRowToMolokai();//否则大人划至M岛
-        num_alduts_M++;//M岛的大人数量+1
-        num_alduts_O--;//O岛的大人数量—1
-        //is_adult_go = false;
-        boatInO = false;//船改至M岛
-        children_condition_m.wake();//唤醒M岛的孩子线程
-        is_adult_go = false;//下一次船再到O岛时，必定是小孩走
-        lock.release();//释放锁
-        //DO NOT PUT ANYTHING ABOVE THIS LINE.
+	//bg.initializeAdult(); //Required for autograder interface. Must be the first thing called.
+	//DO NOT PUT ANYTHING ABOVE THIS LINE.
+        // 获得锁
+        lock.acquire();
 
+        // 如果终点没有小孩，等待
+        if (boatStart && endChildrenCount == 0) {
+            adultsCondition.sleep();
+        }
+
+        // 大人划船去终点（省略上下船过程）
+        System.out.println("大人划船去了终点");
+        boatAdultsCount --;
+        startAdultsCount--;
+        boatStart = false;
+
+        // 唤醒一个小孩
+        endChildrenContidion.wake();
+
+        // 释放锁
+        lock.release();
 	/* This is where you should put your solutions. Make calls
 	   to the BoatGrader to show that it is synchronized. For
 	   example:
@@ -105,59 +131,81 @@ public class Boat
 
     static void ChildItinerary()
     {
-	    bg.initializeChild(); //Required for autograder interface. Must be the first thing called.
-        lock.acquire();//申请锁
-        while(!gameover){
-            if(boatInO){//如果船在O岛
-                if(is_adult_go){//如果大人能走，则将O岛的大人线程唤醒，O岛的孩子线程睡眠
-                    alduts_condition_o.wake();
-                    children_condition_o.sleep();
-                }
-                if(is_pilot){//如果是第一个小孩，则设为舵手
-                    bg.ChildRowToMolokai();
-                    num_children_O--;//O岛小孩数量-1
-                    num_children_M++;//M岛小孩数+1
-                    is_pilot = false;//将舵手设为false
-                    children_condition_o.wake();//唤醒O岛的其他小孩线程
-                    children_condition_m.sleep();//让自己睡眠在M岛
-                }else{//如果是第二个小孩，则设为游客
+	//bg.initializeChild(); //Required for autograder interface. Must be the first thing called.
+	//DO NOT PUT ANYTHING ABOVE THIS LINE.
+        // 只要没全部到达终点，就一直循环
+        while (!success) {
+            // 获得锁
+            lock.acquire();
 
-                    bg.ChildRideToMolokai();
-                    boatInO = false;//将船改为在M岛
-                    //is_on_O = false;
-                    num_children_O--;//O岛的小孩数量-1
-                    num_children_M++;//M岛的小孩数量+1
-                    is_pilot=true;//将舵手设为true
-                    if(num_alduts_O==0&&num_children_O==0){//如果O岛的孩子和大人数量均为0，则游戏结束
-                        gameover = true;
-                    }
-                    if(gameover){//如果游戏结束，则打印成功过河
-                        System.out.println("成功过河！！！");
-                        children_condition_o.sleep();
-                    }
-                    if(num_alduts_O!=0&&num_children_O==0){//如果O岛的大人还有，但小孩线程为0，则大人可走
-                        is_adult_go = true;
-                    }
-                    children_condition_m.wake();//将M岛的其他孩子线程唤醒
-                    children_condition_m.sleep();//将自己睡眠在M岛
+            // 如果船在起点
+            if (boatStart) {
+                // 如果船上人满了
+                if (boatAdultsCount == 1 || boatChildrenCount == 2) {
+                    // 在起点睡眠，等待小孩唤醒
+                    startChildrenCondition.sleep();
+                } else if (boatChildrenCount == 0) {
+                    // 上船
+                    startChildrenCount--;
+                    boatChildrenCount++;
+                    // 唤醒一下在起始点睡眠的小孩
+                    System.out.println("小孩：来个人开船");
+                    startChildrenCondition.wake();
+                    // 在船上睡眠，等别的小孩叫我
+                    boatCondition.sleep();
+                    // 被叫醒之后，到终点
+                    System.out.println("小孩坐船去了终点");
+                    boatChildrenCount--;
+                    endChildrenCount++;
+                    // 唤醒一个在终点的小孩
+                    System.out.println("小孩：检查一下人全了吗？不全的话回去接人");
+                    endChildrenContidion.wake();
+                    // 在终点睡眠，需要接人或全员到终点之后被唤醒
+                    endChildrenContidion.sleep();
+                } else {
+                    boatStart = false;
+                    // 叫醒那个在船上睡眠的小孩
+                    System.out.println("小孩：我上船了，我带你去终点");
+                    boatCondition.wake();
+                    // 到达终点
+                    System.out.println("小孩划船去了终点");
+                    startChildrenCount--;
+                    endChildrenCount++;
+                    // 在终点睡眠，需要接人或全员到终点之后被唤醒
+                    endChildrenContidion.sleep();
                 }
-            }else{//如果船在M岛
-                bg.ChildRowToOahu();
-                //is_on_O = true;
-                boatInO = true;//设置船在O岛
-                num_children_O ++;//O岛孩子数量+1
-                num_children_M --;//M岛孩子线程数量-1
-                if(is_adult_go){//如果大人可以走，则将O岛的大人线程唤醒
-                    alduts_condition_o.wake();
-                }else{//否则，唤醒O岛的孩子线程
-                    children_condition_o.wake();
+            } else {
+                // 人员全部转移完毕
+                if (startChildrenCount == 0 && startAdultsCount == 0) {
+                    success = true;
+                    System.out.println("小孩：人全了");
+                    System.out.println("\n<--- 题目 6 结束测试 --->\n");
+                    // 叫醒所有小孩
+                    endChildrenContidion.wakeAll();
+                } else if (boatChildrenCount == 0) {
+                    // 划船回去（省略上下船过程）
+                    System.out.println("小孩：现在起点还有 " + startAdultsCount + " 个大人");
+                    System.out.println("小孩：现在起点还有 " + startChildrenCount + " 个小孩");
+                    System.out.println("小孩：我得回起点去接他们");
+                    System.out.println("小孩划船回到了起点");
+                    endChildrenCount--;
+                    startChildrenCount++;
+                    boatStart = true;
+                    // 有大人还在起始点且终点还有小孩
+                    if (startAdultsCount != 0 && endChildrenCount != 0) {
+                        // 唤醒一个大人
+                        System.out.println("小孩：让大人上船");
+                        boatAdultsCount++;
+                        adultsCondition.wake();
+                        // 让大人划船，这个小孩先睡觉
+                        startChildrenCondition.sleep();
+                    }
                 }
-                children_condition_o.sleep();//让自己睡眠在O岛
             }
 
+            // 释放锁
+            lock.release();
         }
-        lock.release();//释放锁
-        //DO NOT PUT ANYTHING ABOVE THIS LINE.
     }
 
     static void SampleItinerary()

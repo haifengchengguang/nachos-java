@@ -642,15 +642,7 @@ public class KThread {
 
 	}
 	public static void test_Boat(){
-		Lib.debug(dbgThread, "Enter KThread.selfTest");
-		System.out.println("-----Boat test begin-----");
-
-		new KThread(new Runnable(){
-			public void run(){
-				Boat.selfTest();
-			}
-		}).fork();
-		System.out.println("Successful");
+		Boat.selfTest();
 	}
     public static void selfTest() {
 	Lib.debug(dbgThread, "Enter KThread.selfTest");
