@@ -5,6 +5,7 @@ import nachos.threads.*;
 import nachos.userprog.*;
 
 import java.io.EOFException;
+import java.util.HashSet;
 
 /**
  * Encapsulates the state of a user process that is not contained in its
@@ -23,6 +24,12 @@ public class UserProcess {
      * Allocate a new process.
      */
     public UserProcess() {
+		this.openfile = new OpenFile[max_openfile_num];
+		this.openfile[0] = UserKernel.console.openForReading();
+		this.openfile[1] = UserKernel.console.openForWriting();
+
+		//this.processID = processesCreated++;
+		//this.childrenCreated = new HashSet<Integer>();
 	int numPhysPages = Machine.processor().getNumPhysPages();
 	pageTable = new TranslationEntry[numPhysPages];
 	for (int i=0; i<numPhysPages; i++)
@@ -345,6 +352,105 @@ public class UserProcess {
 	Lib.assertNotReached("Machine.halt() did not halt machine!");
 	return 0;
     }
+	private int handleCreate(int fileAddress) {
+		//处理create()系统调用，创建一个文件，返回文件描述符
+		//读出文件名
+		//系统调用需要读写内存时, 通过 readVirtualMemory 和
+		//writeVirtualMemory 进行
+		String filename = readVirtualMemoryString(fileAddress, 256);
+		if (filename == null)
+			return -1;		//文件名不存在，创建失败
+		//在openfile中找空的位置
+		int fileDescriptor = findEmpty();
+		if (fileDescriptor==-1)
+			return -1;		//fileDescriptor=-1进程打开文件数已经达到上限，无法创建并打开
+			//执行到此处fileDescriptor=openfile为空位的下标
+			//创建
+		else{
+			//创建一个文件，并且将此时的openfile[fileDescriptor]中放入相应的描述符
+			openfile[fileDescriptor]=ThreadedKernel.fileSystem.open(filename, true);//文件不存在直接创建
+		}
+		//返回文件描述符
+		return fileDescriptor;
+	}
+	//与create唯一不同是open函数第二个参数设置为bool false。
+	private int handleOpen(int fileAddress){
+		//处理open()的系统调用，打开一个文件
+		String filename=readVirtualMemoryString(fileAddress,256);
+		if (filename == null)
+			return -1;		//文件名不存在
+		int fileDescriptor = findEmpty();
+		if (fileDescriptor == -1)
+			return -1;		//打开文件数已经达到上限，无法打开
+		else {
+			openfile[fileDescriptor] = ThreadedKernel.fileSystem.open(filename,false);
+			return fileDescriptor;//打开成功返回文件描述符
+		}
+	}
+	private int handleRead(int fileDescriptor,int bufferAddress,int length){
+		//处理read()的系统调用，从文件中读出数据写入 指定虚拟地址
+		//检查给定的文件描述符
+		if(fileDescriptor>15||fileDescriptor<0||openfile[fileDescriptor]==null)
+			return -1;		//文件未打开，出错
+		byte temp[]=new byte[length];
+		//读文件
+		int readNumber=openfile[fileDescriptor].read(temp, 0, length);
+		if(readNumber<=0)
+			return 0;	//没有读出数据
+		int writeNumber=writeVirtualMemory(bufferAddress,temp);
+		return writeNumber;
+	}
+	//与read相似，两者都是针对于已经打开的文件，区别仅在于对虚拟内存读或者写的操作不同罢
+	private int handleWrite(int fileDescriptor,int bufferAddress,int length){
+		//处理write()的系统调用，将指定虚拟内存地址的数据写入文件
+		if(fileDescriptor>15||fileDescriptor<0||openfile[fileDescriptor]==null)
+			return -1;		//文件未打开，出错
+		byte temp[]=new byte[length];
+		//读出虚拟内存地址中的数据到temp中
+		int readNumber=readVirtualMemory(bufferAddress,temp);
+		//数据读出后保存在temp中
+		if(readNumber<=0)
+			return 0;	//未读出数据
+		//将Temp中的数据 写入文件
+		int writeNumber=openfile[fileDescriptor].write(temp, 0, length);
+		if(writeNumber<length)
+			return -1;//未完全写入，出错
+		return writeNumber;
+	}
+	/*Close 系统调用的唯一一个参数为文件描述符。
+	 * 对于Close方法:进程要关闭某个文件，仅仅把文件从descriptors中移除，调用文件的关闭方法即可*/
+	private int handleClose(int fileDescriptor){
+		//处理close()的系统调用，用于关闭打开的文件
+		if(fileDescriptor>15||fileDescriptor<0||openfile[fileDescriptor]==null)
+			return -1;				//文件不存在，关闭出错
+		openfile[fileDescriptor].close();
+		openfile[fileDescriptor]=null;
+		return 0;
+	}
+	private int handleUnlink(int fileAddress){
+		//处理unlink的系统调用，用于删除文件
+		//获得文件名
+		String filename=readVirtualMemoryString(fileAddress,256);
+		if(filename==null)
+			return 0;		//文件不存在，不必删除
+		if(ThreadedKernel.fileSystem.remove(filename))//删除磁盘中实际的文件
+			return 0;
+		else
+			return -1;
+	}
+	/**
+	 * function:
+	 * 		从openfile中找到一个空的文件描述符位。
+	 * @return
+	 * 			数组下标,如果没有空的，则返回-1
+	 */
+	private int findEmpty() {
+		for (int i = 0; i < 16; i++) {
+			if (openfile[i] == null)
+				return i;
+		}
+		return -1;
+	}
 
 
     private static final int
@@ -391,6 +497,21 @@ public class UserProcess {
 	switch (syscall) {
 	case syscallHalt:
 	    return handleHalt();
+		case syscallCreate:
+			return handleCreate(a0);
+		case syscallOpen:
+
+			return handleOpen(a0);
+		case syscallRead:
+			return handleRead(a0,a1,a2);
+		case syscallWrite:
+			return handleWrite(a0,a1,a2);
+		case syscallClose:
+
+			return handleClose(a0);
+		case syscallUnlink:
+
+			return handleUnlink(a0);
 
 
 	default:
@@ -446,4 +567,6 @@ public class UserProcess {
 	
     private static final int pageSize = Processor.pageSize;
     private static final char dbgProcess = 'a';
+	protected final OpenFile[] openfile;
+	private static int max_openfile_num = 16;
 }

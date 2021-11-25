@@ -41,9 +41,11 @@ public class Communicator {
         if(listenerNum==0){
             //如果听者为0,需要将speaker加入队列
             speakerNum++;
-            //将要传输的int放入链表尾部
+            //将要传输的int放入尾部
             queue.offer(word);
             speaker.sleep();
+
+            //
             listener.wake();
             speakerNum--;
         }

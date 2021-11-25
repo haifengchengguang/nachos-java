@@ -276,39 +276,39 @@ public class KThread {
      * call is not guaranteed to return. This thread must not be the current
      * thread.
      */
-    public void join() {
-		// 线程B中有A.join()语句，则B等待A执行完才能执行
-
-		Lib.debug(dbgThread, "Joining to thread: " + toString());
-
-		//判断是不是当前线程调用了join
-		Lib.assertTrue(this != currentThread);
-		// start
-//		Lib.assertTrue(join_counter == 0);
-		join_counter++;
-		//关中断
-		boolean status = Machine.interrupt().disable();
-		//如果调用join()的对象的status不为完成状态
-		if(!hasAcquired) {
-			waitQueue.acquire(this);
-			hasAcquired = true;
-		}
-		if (this.status != statusFinished) {
-			//将KThread下的current对象放入waitQueue
-			waitQueue.waitForAccess(KThread.currentThread());
-			//将当前线程睡眠
-
-			sleep();
-		}
-
-		//如果是Finish状态则直接返回
-		//开中断
-
-		Machine.interrupt().restore(status);
-		// end
-
-	}
-	public void join1(){
+//    public void join() {
+//		// 线程B中有A.join()语句，则B等待A执行完才能执行
+//
+//		Lib.debug(dbgThread, "Joining to thread: " + toString());
+//
+//		//判断是不是当前线程调用了join
+//		Lib.assertTrue(this != currentThread);
+//		// start
+////		Lib.assertTrue(join_counter == 0);
+//		join_counter++;
+//		//关中断
+//		boolean status = Machine.interrupt().disable();
+//		//如果调用join()的对象的status不为完成状态
+//		if(!hasAcquired) {
+//			waitQueue.acquire(this);
+//			hasAcquired = true;
+//		}
+//		if (this.status != statusFinished) {
+//			//将KThread下的current对象放入waitQueue
+//			waitQueue.waitForAccess(KThread.currentThread());
+//			//将当前线程睡眠
+//
+//			sleep();
+//		}
+//
+//		//如果是Finish状态则直接返回
+//		//开中断
+//
+//		Machine.interrupt().restore(status);
+//		// end
+//
+//	}
+	public void join(){
 		Lib.debug(dbgThread, "Joining to thread: " + toString());
 
 		Lib.assertTrue(this != currentThread);//调用该方法的进程与正在运行的进程不一致
@@ -446,27 +446,29 @@ public class KThread {
     /**
      * Tests whether this module is working.
      */
-	public static void test_join() {
-
+//	public static void test_join() {
+//
+//		//本题我简单的创建了两个进程A,B，首先执行B，在执行B的过程中对A执行join方法，
+//		//因此B被挂起，A开始循环执行，等到A执行完毕，B才会返回执行并结束。
+//		Lib.debug(dbgThread, "Enter KThread.selfTest");
+//		boolean ints = Machine.interrupt().disable();
+//		System.out.println("-----Now we begin to test join()!-----");
+//		//fork只是将它们放到就绪队列并未开始执行
+//		final KThread thread1 = new KThread(new PingTest(1));
+//		//thread1.setName("forked thread").fork();
+//		new KThread(new Runnable(){
+//			public void run(){
+//				System.out.println("*** 线程2运行开始");
+//				thread1.join();
+//				System.out.println("*** 线程2运行结束");
+//			}
+//		}).fork();
+//		thread1.setName("forked thread").fork();
+//		Machine.interrupt().restore(ints);
+//	}
+	public static void my_join_test(){
 		//本题我简单的创建了两个进程A,B，首先执行B，在执行B的过程中对A执行join方法，
 		//因此B被挂起，A开始循环执行，等到A执行完毕，B才会返回执行并结束。
-		Lib.debug(dbgThread, "Enter KThread.selfTest");
-		boolean ints = Machine.interrupt().disable();
-		System.out.println("-----Now we begin to test join()!-----");
-		//fork只是将它们放到就绪队列并未开始执行
-		final KThread thread1 = new KThread(new PingTest(1));
-		//thread1.setName("forked thread").fork();
-		new KThread(new Runnable(){
-			public void run(){
-				System.out.println("*** 线程2运行开始");
-				thread1.join();
-				System.out.println("*** 线程2运行结束");
-			}
-		}).fork();
-		thread1.setName("forked thread").fork();
-		Machine.interrupt().restore(ints);
-	}
-	public static void my_join_test(){
 		KThread threadA=new KThread(new Runnable() {
 			@Override
 			public void run() {
@@ -481,7 +483,7 @@ public class KThread {
 			@Override
 			public void run() {
 				System.out.println("线程B开始运行");
-				threadA.join1();
+				threadA.join();
 				System.out.println("线程B结束运行");
 			}
 		});
@@ -584,8 +586,9 @@ public class KThread {
 		});
 		speaker1.fork();
 		listener1.fork();
-		speaker2.fork();
-		listener2.fork();
+
+
+
 	}
 	public static void test_Priority(){
 		boolean status=Machine.interrupt().disable();//关中断
@@ -624,11 +627,11 @@ public class KThread {
 				yield();
 				System.out.println("C重新使用CPU");
 				System.out.println("C线程等待A线程");
-				kThreadA.join1();
+				kThreadA.join();
 				System.out.println("C重新使用CPU");
 				System.out.println("C线程结束运行");
 				// 不允许优先级传递时打印下面的语句
-				System.out.println("\n<--- 题目 5 结束测试 --->\n");
+				//System.out.println("\n<--- 题目 5 结束测试 --->\n");
 			}
 		}).setName("threadC");//创建线程C
 		new PriorityScheduler().setPriority(kThreadC,6);//将线程C的优先级设为6
@@ -649,13 +652,13 @@ public class KThread {
 	
 	//new KThread(new PingTest(1)).setName("forked thread").fork();
 	//new PingTest(0).run();
-	//test_join();
+
 	//my_join_test();
 	//test_condition_var();
 	//test_Alarm();
 	//test_communicator();
     //test_Priority();
-		test_Boat();
+	test_Boat();
 	}
 
     private static final char dbgThread = 't';

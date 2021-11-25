@@ -33,12 +33,12 @@ public class Condition2 {
     public void sleep() {
 	Lib.assertTrue(conditionLock.isHeldByCurrentThread());//检测当前线程是否获得锁
     boolean status=Machine.interrupt().disable();//关中断
-	conditionLock.release();
+	conditionLock.release();//释放锁
 	if(KThread.currentThread()!=null)
-    waitqueue.waitForAccess(KThread.currentThread());
-        KThread.currentThread().sleep();//返回就是又线程使用wake唤醒
+    waitqueue.waitForAccess(KThread.currentThread());//放入等待队列
+        KThread.currentThread().sleep();//将当前线程睡眠
 
-	conditionLock.acquire();
+	conditionLock.acquire();//获得锁
     Machine.interrupt().restore(status);//开中断
     }
 
@@ -64,10 +64,10 @@ public class Condition2 {
      * thread must hold the associated lock.
      */
     public void wakeAll() {
-	    Lib.assertTrue(conditionLock.isHeldByCurrentThread());
+	    Lib.assertTrue(conditionLock.isHeldByCurrentThread());//当前进程有锁
         //start
         boolean status = Machine.interrupt().disable();
-        KThread thread = waitqueue.nextThread();
+        KThread thread = waitqueue.nextThread();//唤醒全部进程
         while(thread!=null){
             thread.ready();
             thread=waitqueue.nextThread();

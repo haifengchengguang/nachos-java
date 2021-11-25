@@ -38,7 +38,7 @@ public class Alarm {
     public void timerInterrupt() {
         boolean status=Machine.interrupt().disable();
         long currentTime=Machine.timer().getTime();//获取现在的时间
-        int size = list.size();
+        int size = list.size();//遍历链表，将时间到了的线程唤醒
         if(size!=0){
             for (int i=0;i<size;i++)
             {
@@ -54,7 +54,7 @@ public class Alarm {
                 }
             }
         }
-	KThread.currentThread().yield();
+	    KThread.currentThread().yield();//
         Machine.interrupt().restore(status);
     }
 
@@ -88,11 +88,11 @@ public class Alarm {
      */
     public void waitUntil(long x) {
 	// for now, cheat just to get something working (busy waiting is bad)
-        boolean status=Machine.interrupt().disable();
-	    long wakeTime = Machine.timer().getTime() + x;
-        ThreadInfo threadInfo=new ThreadInfo(KThread.currentThread(),wakeTime);
-        list.add(threadInfo);
-        KThread.currentThread().sleep();
+        boolean status=Machine.interrupt().disable();//关中断
+	    long wakeTime = Machine.timer().getTime() + x;//计算唤醒时间
+        ThreadInfo threadInfo=new ThreadInfo(KThread.currentThread(),wakeTime);//线程及唤醒时间ThreadInfo
+        list.add(threadInfo);//链表保存threadinfo
+        KThread.currentThread().sleep();//sleep
         Machine.interrupt().restore(status);
 
 //	while (wakeTime > Machine.timer().getTime())

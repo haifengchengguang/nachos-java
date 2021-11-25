@@ -311,10 +311,10 @@ public class PriorityScheduler extends Scheduler {
 	 * @see	nachos.threads.ThreadQueue#nextThread
 	 *
 	 */
-	//这个是干什么的
+
 	public void acquire(PriorityQueue waitQueue) {
 	    // implement me
-		//waitQueue.waitlist.remove(this);//如果这个队列中存在该线程，删除
+
 		Lib.assertTrue(Machine.interrupt().disabled());
 
 		// 断言此时优先级队列中内容为空

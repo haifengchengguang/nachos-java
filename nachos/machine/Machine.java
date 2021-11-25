@@ -41,10 +41,12 @@ public final class Machine {
 	// get the test directory
 	if (testDirectoryName != null) {
 	    testDirectory = new File(testDirectoryName);
+		System.out.println(testDirectory);
 	}
 	else {
 	    // use ../test
-	    testDirectory = new File(baseDirectory.getParentFile(), "test");
+	    testDirectory = new File(baseDirectory.getParentFile(), "nachos-java\\nachos\\test");
+		System.out.println(testDirectory);
 	}
 	//配置安全管理机制
 	securityManager = new NachosSecurityManager(testDirectory);
