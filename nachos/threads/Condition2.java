@@ -54,7 +54,7 @@ public class Condition2 {
         if(!(thread==null))
             thread.ready();//只是将线程加入就绪队列但不释放锁
 //	    else if(thread==null)
-//		System.out.println("111");
+//		System.out.println("111.txt");
         Machine.interrupt().restore(status);
         //end
     }

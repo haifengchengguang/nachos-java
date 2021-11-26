@@ -90,6 +90,7 @@ public final class Machine {
      *
      * @param	e	the exception or error.
      */
+    //异常处理
     public static void terminate(Throwable e) {
 	if (e instanceof ThreadDeath)
 	    throw (ThreadDeath) e;

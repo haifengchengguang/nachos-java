@@ -4,6 +4,8 @@ import nachos.machine.*;
 import nachos.threads.*;
 import nachos.userprog.*;
 
+import java.util.LinkedList;
+
 /**
  * A kernel that can support multiple user processes.
  */
@@ -11,9 +13,47 @@ public class UserKernel extends ThreadedKernel {
     /**
      * Allocate a new user kernel.
      */
+	private static LinkedList<Integer> AllFreePageNums;
     public UserKernel() {
 	super();
+		// 初始化内存列表
+		AllFreePageNums = new LinkedList<>();
+
+		// 获取物理页数
+		int numPhysPages = Machine.processor().getNumPhysPages();
+
+		// 为空闲页编号
+		for (int i = 0; i < numPhysPages; i++) {
+			AllFreePageNums.add(i);
+		}
     }
+	public static LinkedList<Integer> getFreePageNums(int numPages) {
+		// 声明并初始化一个空闲页号链表
+		LinkedList<Integer> freePageNums = new LinkedList<>();
+
+		// 如果空闲页足够
+		if (AllFreePageNums.size() >= numPages) {
+			// 从空闲页中取出指定数量的页号，并添加到 freePages 中
+			for (int i = 0; i < numPages; i++) {
+				freePageNums.add(AllFreePageNums.removeFirst());
+			}
+		}
+
+		return freePageNums;
+	}
+
+	// 归还空闲页
+	public static void releaseOwnPageNums(LinkedList<Integer> ownPageNums){
+		// 如果进程没有占有页，直接返回
+		if (ownPageNums == null || ownPageNums.isEmpty()) {
+			return;
+		}
+
+		// 将进程中页号转换成空闲页号
+		for (int i = 0; i < ownPageNums.size(); i ++) {
+			AllFreePageNums.add(ownPageNums.removeFirst());
+		}
+	}
 
     /**
      * Initialize this kernel. Creates a synchronized console and sets the
@@ -35,18 +75,18 @@ public class UserKernel extends ThreadedKernel {
     public void selfTest() {
 	super.selfTest();
 
-	System.out.println("Testing the console device. Typed characters");
-	System.out.println("will be echoed until q is typed.");
-
-	char c;
-
-	do {
-	    c = (char) console.readByte(true);
-	    console.writeByte(c);
-	}
-	while (c != 'q');
-
-	System.out.println("");
+//	System.out.println("Testing the console device. Typed characters");
+//	System.out.println("will be echoed until q is typed.");
+//
+//	char c;
+//
+//	do {
+//	    c = (char) console.readByte(true);
+//	    console.writeByte(c);
+//	}
+//	while (c != 'q');
+//
+//	System.out.println("");
     }
 
     /**
