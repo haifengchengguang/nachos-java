@@ -2,6 +2,8 @@ package nachos.threads;
 
 import nachos.machine.*;
 
+import java.util.LinkedList;
+
 /**
  * A KThread is a thread that can be used to execute Nachos kernel code. Nachos
  * allows multiple threads to run concurrently.
@@ -43,6 +45,8 @@ public class KThread {
      * create an idle thread as well.
      */
     public KThread() {
+		// 初始化等待线程列表
+		waitThreadList = new LinkedList<>();
 	if (currentThread != null) {
 	    tcb = new TCB();
 	}	    
@@ -193,12 +197,13 @@ public class KThread {
 
 
 	currentThread.status = statusFinished;
-		KThread thread = currentThread().waitQueue.nextThread();
-		if (thread != null) {
-			thread.ready();
+		// 遍历当前线程的等待线程列表
+		for (KThread waitThread : currentThread().waitThreadList) {
+			// 让等待线程进入就绪装填
+			waitThread.ready();
 		}
-		// end
-	sleep();
+
+		sleep();
     }
 
     /**
@@ -315,6 +320,8 @@ public class KThread {
 
 		boolean status = Machine.interrupt().disable();//关中断
 		waitQueue.acquire(this);
+		// 使之前的优先级顺序失效
+		setPriorityStatus(false);
 		if (this.status != statusFinished) {
 			//将KThread下的current对象放入waitQueue
 			waitQueue.waitForAccess(KThread.currentThread());
@@ -644,6 +651,52 @@ public class KThread {
 
 
 	}
+
+	public static void test_Lottery(){
+		System.out.println("-----Now begin the test_LotteryPriority()-----");
+		KThread thread1=new KThread(new Runnable(){
+			public void run(){
+				for(int i=0;i<3;i++){
+					KThread.currentThread.yield();
+					System.out.println("thread1");
+
+				}
+			}
+		});
+
+		KThread thread2=new KThread(new Runnable(){
+			public void run(){
+				for(int i=0;i<3;i++){
+					KThread.currentThread.yield();
+					System.out.println("thread2");
+
+				}
+			}
+		});
+
+		KThread thread3=new KThread(new Runnable(){
+			public void run(){
+				thread1.join();
+				for(int i=0;i<3;i++){
+					KThread.currentThread.yield();
+					System.out.println("thread3");
+				}
+			}
+		});
+		boolean status = Machine.interrupt().disable();
+		ThreadedKernel.scheduler.setPriority(thread1,1);
+		ThreadedKernel.scheduler.setPriority(thread2,2);
+		ThreadedKernel.scheduler.setPriority(thread3,6);
+		thread1.setName("thread-1");
+		thread2.setName("thread-2");
+		thread3.setName("thread-3");
+
+		Machine.interrupt().restore(status);
+		thread1.fork();
+		thread2.fork();
+		thread3.fork();
+	}
+
 	public static void test_Boat(){
 		Boat.selfTest();
 	}
@@ -657,8 +710,9 @@ public class KThread {
 	//test_condition_var();
 	//test_Alarm();
 	//test_communicator();
-    //test_Priority();
+    test_Priority();
 	//test_Boat();
+		//test_Lottery();
 	}
 
     private static final char dbgThread = 't';
@@ -702,4 +756,22 @@ public class KThread {
     private static KThread currentThread = null;
     private static KThread toBeDestroyed = null;
     private static KThread idleThread = null;
+	private LinkedList<KThread> waitThreadList = null;
+	// 获取等待线程列表
+	public LinkedList<KThread> getWaitThreadList() {
+		return waitThreadList;
+	}
+	// 优先级状态：之前的优先级顺序是否有效，true 表示有效
+	private static boolean priorityStatus = false;
+
+	// 获取优先级状态
+	public static boolean getPriorityStatus() {
+		return priorityStatus;
+	}
+
+	// 改变优先级状态
+	public static void setPriorityStatus(boolean status) {
+		priorityStatus = status;
+	}
+
 }

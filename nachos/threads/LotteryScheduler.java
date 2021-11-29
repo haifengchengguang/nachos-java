@@ -32,7 +32,7 @@ public class LotteryScheduler extends PriorityScheduler {
      */
     public LotteryScheduler() {
     }
-    
+
     /**
      * Allocate a new lottery thread queue.
      *
@@ -42,7 +42,82 @@ public class LotteryScheduler extends PriorityScheduler {
      * @return	a new lottery thread queue.
      */
     public ThreadQueue newThreadQueue(boolean transferPriority) {
-	// implement me
-	return null;
+        return new LotteryQueue(transferPriority);
     }
+    protected class LotteryThreadState extends ThreadState {
+        public LotteryThreadState(KThread thread) {
+            super(thread);
+        }
+
+        public int getEffectivePriority() {
+            // 尝试使用之前保存的数据
+            if (KThread.getPriorityStatus()) {
+                return effectivePriority;
+            }
+
+            // 重新计算有效优先级
+            effectivePriority = priority;
+
+            // 遍历该线程的等待线程列表
+            for (KThread waitThread : thread.getWaitThreadList()) {
+                // 等待线程的有效优先级
+                effectivePriority += getThreadState(waitThread).getEffectivePriority();
+            }
+
+            return effectivePriority;
+        }
+    }
+    protected class LotteryQueue extends PriorityQueue {
+        LotteryQueue(boolean transferPriority) {
+            super(transferPriority);
+        }
+
+        protected ThreadState pickNextThread() {
+            // 计算彩票总数
+            int lotterySum = 0;
+            for (ThreadState lotteryThreadState : waitlist) {
+                if (transferPriority) {
+                    lotterySum += lotteryThreadState.getEffectivePriority();
+                } else {
+                    lotterySum += lotteryThreadState.getPriority();
+                }
+
+            }
+
+            // 当前存在可运行的线程
+            if (lotterySum != 0) {
+                // 指定获胜彩票
+                int winLottery = Lib.random(lotterySum) + 1;
+
+                // 当前彩票计数
+                int currentLotteryNum = 0;
+
+                // 遍历所有线程，直到找到持有中奖彩票的线程
+                for (ThreadState lotteryThreadState: waitlist) {
+                    if (transferPriority) {
+                        currentLotteryNum += lotteryThreadState.getEffectivePriority();
+                    } else {
+                        currentLotteryNum += lotteryThreadState.getPriority();
+                    }
+
+                    // 找到获奖彩票
+                    if (currentLotteryNum >= winLottery) {
+                        return lotteryThreadState;
+                    }
+                }
+            }
+
+            return null;
+        }
+    }
+
+
+    protected ThreadState getThreadState(KThread thread) {
+        if (thread.schedulingState == null)
+            thread.schedulingState = new LotteryThreadState(thread);
+
+        return (ThreadState) thread.schedulingState;
+    }
+
+
 }

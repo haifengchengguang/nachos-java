@@ -169,24 +169,29 @@ public class PriorityScheduler extends Scheduler {
 		int currentMaxPriority = -1;
 
 		// 遍历优先级队列中的每一个线程
-		for (ThreadState threadState: waitlist) {
-
-			// 判断是否可以传递优先级
+		for (ThreadState threadState : waitlist) {
+			// 根据是否可以传递优先级，获取到实际用于比较的优先级
 			int threadPriority;
 			if (transferPriority) {
-				// 获取线程包括其等待队列的最高优先级
+				// 线程包括其等待队列中最高的优先级
 				threadPriority = threadState.getEffectivePriority();
 			} else {
-				// 获取线程的优先级（未传递）
+				// 线程本身的优先级（未传递）
 				threadPriority = threadState.getPriority();
 			}
 
 			// 选择优先级更高的线程
 			if (threadPriority > currentMaxPriority) {
 				nextThreadState = threadState;
-				currentMaxPriority = nextThreadState.priority;
+				currentMaxPriority = threadPriority;
 			}
 		}
+
+		if (waitlist.size() != 0) {
+			// 将保存的有效优先级设置为有效
+			KThread.setPriorityStatus(true);
+		}
+
 
 		return nextThreadState;
 	}
@@ -214,7 +219,9 @@ public class PriorityScheduler extends Scheduler {
      * @see	nachos.threads.KThread#schedulingState
      */
     protected class ThreadState {
-	/**
+		// 有效优先级
+		protected int effectivePriority;
+		/**
 	 * Allocate a new <tt>ThreadState</tt> object and associate it with the
 	 * specified thread.
 	 *
@@ -224,6 +231,9 @@ public class PriorityScheduler extends Scheduler {
 	    this.thread = thread;
 	    
 	    setPriority(priorityDefault);
+
+		// 设置有效优先级
+		this.effectivePriority = this.priority;
 	}
 
 	/**
@@ -241,29 +251,26 @@ public class PriorityScheduler extends Scheduler {
 	 * @return	the effective priority of the associated thread.
 	 */
 	public int getEffectivePriority() {
-		// 如果该线程有等待队列
-		if (thread.waitQueue != null) {
-			// 创建一个链表来临时存放该线程的等待队列中的线程
-			ThreadQueue newQueue = ThreadedKernel.scheduler.newThreadQueue(true);
-
-			// 遍历该线程的等待队列中的所有线程
-			KThread waitThread;
-			int waitThreadPriority;
-			while ((waitThread = thread.waitQueue.nextThread()) != null) {
-				// 将取出的线程添加到队列中去
-				newQueue.waitForAccess(waitThread);
-				// 如果等待队列中的线程的优先级更高，就把优先级传递给该线程
-				waitThreadPriority = getThreadState(waitThread).getPriority();
-				if (priority < waitThreadPriority){
-					priority = waitThreadPriority;
-				}
-			}
-
-			// 完成等待队列的转移和交换
-			thread.waitQueue = newQueue;
+		// 尝试使用之前保存的数据
+		if (KThread.getPriorityStatus()) {
+			return effectivePriority;
 		}
 
-		return priority;
+		// 重新计算有效优先级
+		effectivePriority = priority;
+
+		// 遍历该线程的等待线程列表
+		for (KThread waitThread : thread.getWaitThreadList()) {
+			// 等待线程的有效优先级
+			int targetPriority = getThreadState(waitThread).getEffectivePriority();
+			// 如果等待线程的有效优先级更高
+			if (effectivePriority < targetPriority) {
+				// 进行优先级传递
+				effectivePriority = targetPriority;
+			}
+		}
+
+		return effectivePriority;
 	}
 
 	/**
@@ -272,11 +279,19 @@ public class PriorityScheduler extends Scheduler {
 	 * @param	priority	the new priority.
 	 */
 	public void setPriority(int priority) {
-	    if (this.priority == priority)
-		return;
-	    
-	    this.priority = priority;
-	    
+		if (this.priority == priority)
+			return;
+
+		// 如果设置的优先级在有效范围值之外的话，打印信息并返回
+		if (priority < priorityMinimum || priority > priorityMaximum) {
+			System.out.println("优先级设置失败");
+			return;
+		}
+
+		// 将保存的有效优先级设置为无效
+		KThread.setPriorityStatus(false);
+
+		this.priority = priority;
 	    // implement me
 	}
 
