@@ -324,7 +324,7 @@ public class KThread {
 		setPriorityStatus(false);
 		if (this.status != statusFinished) {
 			//将KThread下的current对象放入waitQueue
-			waitQueue.waitForAccess(KThread.currentThread());
+			waitThreadList.add(KThread.currentThread());
 			//将当前线程睡眠
 			sleep();
 		}
@@ -637,8 +637,8 @@ public class KThread {
 				kThreadA.join();
 				System.out.println("C重新使用CPU");
 				System.out.println("C线程结束运行");
-				// 不允许优先级传递时打印下面的语句
-				//System.out.println("\n<--- 题目 5 结束测试 --->\n");
+				 //不允许优先级传递时打印下面的语句
+				System.out.println("\n<--- 题目 5 结束测试 --->\n");
 			}
 		}).setName("threadC");//创建线程C
 		new PriorityScheduler().setPriority(kThreadC,6);//将线程C的优先级设为6
